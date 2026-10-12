@@ -3,7 +3,6 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies for better-sqlite3 native compilation if needed
 RUN apk add --no-cache python3 make g++
 
 COPY package*.json ./
@@ -26,10 +25,7 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
 COPY server.js db.js ./
 
-# Create data directory for SQLite persistent storage
-RUN mkdir -p /app/data && chown -R node:node /app
-
-USER node
+RUN mkdir -p /app/data
 
 EXPOSE 3002
 
