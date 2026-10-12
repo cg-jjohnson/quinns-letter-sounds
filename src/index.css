@@ -1,0 +1,135 @@
+:root {
+  font-family: 'Fredoka', 'Quicksand', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 500;
+  color: #2d3436;
+  background-color: #f3e5f5;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: linear-gradient(180deg, #E1F5FE 0%, #F3E5F5 50%, #FFF3E0 100%);
+  background-attachment: fixed;
+}
+
+/* Clouds Background */
+.clouds-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.cloud {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 100px;
+  filter: blur(4px);
+}
+
+.cloud-1 {
+  width: 280px;
+  height: 90px;
+  top: 8%;
+  left: -200px;
+  animation: floatCloud 32s linear infinite;
+}
+
+.cloud-2 {
+  width: 380px;
+  height: 120px;
+  top: 22%;
+  left: -350px;
+  animation: floatCloud 45s linear infinite 12s;
+}
+
+.cloud-3 {
+  width: 220px;
+  height: 70px;
+  top: 40%;
+  left: -220px;
+  animation: floatCloud 38s linear infinite 24s;
+}
+
+@keyframes floatCloud {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(calc(100vw + 500px)); }
+}
+
+/* Glass Card */
+.glass-card {
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 2px solid rgba(255, 255, 255, 0.6) !important;
+  border-radius: 28px !important;
+  box-shadow: 0 12px 32px rgba(124, 77, 255, 0.12) !important;
+}
+
+/* Balloon Animation */
+.balloon-wrapper {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+
+.balloon-wrapper:hover {
+  transform: translateY(-8px) scale(1.04);
+}
+
+.balloon-float-0 { animation: balloonFloat 4s ease-in-out infinite alternate; }
+.balloon-float-1 { animation: balloonFloat 4.6s ease-in-out infinite alternate 0.5s; }
+.balloon-float-2 { animation: balloonFloat 3.8s ease-in-out infinite alternate 1s; }
+.balloon-float-3 { animation: balloonFloat 4.2s ease-in-out infinite alternate 1.5s; }
+.balloon-float-4 { animation: balloonFloat 4.8s ease-in-out infinite alternate 2s; }
+.balloon-float-5 { animation: balloonFloat 3.6s ease-in-out infinite alternate 2.5s; }
+
+@keyframes balloonFloat {
+  0% { transform: translateY(0) rotate(-1.5deg); }
+  100% { transform: translateY(-16px) rotate(2deg); }
+}
+
+/* Fish Swimming Motion */
+.swimming-fish {
+  animation: fishSwim 3.5s ease-in-out infinite alternate;
+}
+
+@keyframes fishSwim {
+  0% { transform: translateY(0px) rotate(-1deg); }
+  50% { transform: translateY(-8px) rotate(1.5deg); }
+  100% { transform: translateY(4px) rotate(-1deg); }
+}
+
+.wiggle-tail {
+  transform-origin: 105px 42.5px;
+  animation: tailWiggle 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes tailWiggle {
+  0% { transform: rotate(-8deg); }
+  100% { transform: rotate(8deg); }
+}
+
+/* Pulse Button */
+.pulse-btn {
+  animation: pulseGlow 2s infinite;
+}
+
+@keyframes pulseGlow {
+  0% { box-shadow: 0 0 0 0 rgba(255, 64, 129, 0.5); }
+  70% { box-shadow: 0 0 0 16px rgba(255, 64, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 64, 129, 0); }
+}
+
+@keyframes bounce {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-8px); }
+}

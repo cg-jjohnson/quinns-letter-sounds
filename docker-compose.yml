@@ -1,0 +1,15 @@
+services:
+  quinns-letter-sounds:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quinns-letter-sounds
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - NODE_ENV=production
+      - DB_DIR=/app/data
+    volumes:
+      - ./data:/app/data
