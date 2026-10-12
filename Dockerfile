@@ -1,9 +1,7 @@
 # Stage 1: Build Frontend
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
-
-RUN apk add --no-cache python3 make g++
 
 COPY package*.json ./
 RUN npm install
@@ -12,11 +10,9 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Production Server
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 
 WORKDIR /app
-
-RUN apk add --no-cache python3 make g++
 
 COPY package*.json ./
 RUN npm install --omit=dev
