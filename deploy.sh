@@ -52,6 +52,7 @@ fi
 
 # 5. Build and Spin Up Docker Container
 echo "🚀 Building and spinning up Quinn's Letter Sounds container on port $ASSIGNED_PORT..."
+docker-compose --env-file "$ENV_FILE" down || true
 docker-compose --env-file "$ENV_FILE" up -d --build
 
 echo "🎉 Quinn's Letter Sounds is successfully running on http://$(hostname -I | awk '{print $1}'):$ASSIGNED_PORT"
