@@ -36,12 +36,13 @@ export function playStaticAudio(audioFilename, fallbackText = null) {
   if (!audioFilename) return;
 
   if (currentAudio) {
-    currentAudio.pause();
-    currentAudio.currentTime = 0;
+    try {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+    } catch (e) {}
     currentAudio = null;
   }
 
-  // Try .m4a first, then .wav
   const baseName = audioFilename.replace(/\.(m4a|wav|mp3)$/, '');
   const audio = new Audio(`/audio/${baseName}.m4a`);
   currentAudio = audio;
@@ -50,21 +51,23 @@ export function playStaticAudio(audioFilename, fallbackText = null) {
     if (currentAudio === audio) currentAudio = null;
   };
 
-  audio.onerror = () => {
-    // Try wav
-    const wavAudio = new Audio(`/audio/${baseName}.wav`);
-    currentAudio = wavAudio;
-    wavAudio.play().catch(() => {
+  const tryMp3OrFallback = () => {
+    const mp3Audio = new Audio(`/audio/${baseName}.mp3`);
+    currentAudio = mp3Audio;
+    mp3Audio.onended = () => {
+      if (currentAudio === mp3Audio) currentAudio = null;
+    };
+    mp3Audio.play().catch(() => {
       if (fallbackText && 'speechSynthesis' in window) {
         speakFallback(fallbackText);
       }
     });
   };
 
-  audio.play().catch(e => {
-    if (fallbackText && 'speechSynthesis' in window) {
-      speakFallback(fallbackText);
-    }
+  audio.onerror = tryMp3OrFallback;
+
+  audio.play().catch(() => {
+    tryMp3OrFallback();
   });
 }
 
