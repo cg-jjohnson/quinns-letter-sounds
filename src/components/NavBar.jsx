@@ -111,7 +111,7 @@ const NavBar = ({
               Quinn's Letter Sounds 🎈🔊
             </Typography>
             <Chip
-              label="v1.2.0"
+              label="v1.3.0"
               size="small"
               sx={{
                 bgcolor: 'rgba(124, 77, 255, 0.12)',

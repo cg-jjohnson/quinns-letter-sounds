@@ -22,9 +22,12 @@ const ProgressDashboard = ({
   stats,
   activeProfile,
   progress,
+  trainProgress = {},
+  wordStats = {},
   onResetStats,
 }) => {
   const letters = stats?.letters || {};
+  const words = wordStats?.words || {};
 
   let totalQuestions = 0;
   let totalCorrect = 0;
@@ -45,6 +48,11 @@ const ProgressDashboard = ({
     speakPhonicsPrompt(ltr);
   };
 
+  const trainLevel = trainProgress.level || 1;
+  const trainGrade = trainLevel <= 9 ? 'Pre-K' : 'Kindergarten';
+  const trainTotalWords = trainProgress.total_words_spelled || 0;
+  const trainInLevel = trainProgress.correct_in_level || 0;
+
   return (
     <Box sx={{ width: '100%', maxWidth: 1000, mx: 'auto', py: 3, px: 2 }}>
       {/* Header Summary */}
@@ -63,7 +71,7 @@ const ProgressDashboard = ({
           {activeProfile?.name || 'Quinn'}'s Phonics Scores ⭐
         </Typography>
         <Typography variant="body1" sx={{ color: '#636E72', fontWeight: 600 }}>
-          Track letter sound recognition and mastery across all games!
+          Track letter sound recognition and sight word spelling progress!
         </Typography>
       </Box>
 
@@ -100,20 +108,20 @@ const ProgressDashboard = ({
             </Typography>
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, my: 1 }}>
               <Box>
-                <Typography variant="caption" sx={{ color: '#666', fontWeight: 700 }}>CURRENT</Typography>
+                <Typography variant="caption" sx={{ color: '#666', fontWeight: 700 }}>BALLOONS</Typography>
                 <Typography variant="h4" sx={{ fontWeight: 800, color: '#FF9100' }}>
                   {progress?.streak || 0} 🔥
                 </Typography>
               </Box>
               <Box sx={{ borderLeft: '2px solid #EEE', pl: 2 }}>
-                <Typography variant="caption" sx={{ color: '#666', fontWeight: 700 }}>BEST</Typography>
+                <Typography variant="caption" sx={{ color: '#666', fontWeight: 700 }}>TRAIN</Typography>
                 <Typography variant="h4" sx={{ fontWeight: 800, color: '#7C4DFF' }}>
-                  {progress?.best_streak || 0} 🏆
+                  {trainProgress?.streak || 0} 🚂
                 </Typography>
               </Box>
             </Box>
             <Typography variant="caption" sx={{ color: '#888', fontWeight: 600 }}>
-              Level {progress?.level || 1} Explorer
+              Best Streak: {Math.max(progress?.best_streak || 0, trainProgress?.best_streak || 0)} 🏆
             </Typography>
           </Paper>
         </Grid>
@@ -145,6 +153,70 @@ const ProgressDashboard = ({
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Phonics Spelling Train Mastery Section */}
+      <Paper className="glass-card" sx={{ p: 3, mb: 4, borderRadius: '24px', border: '2px solid #FFE082' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Typography sx={{ fontSize: '2.4rem' }}>🚂</Typography>
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: '#E65100' }}>
+                Phonics Spelling Train Progress
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#6D4C41', fontWeight: 600 }}>
+                {trainGrade} • Level {trainLevel} • 15 correct required to unlock next level
+              </Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Chip
+              label={`${trainTotalWords} Words Spelled`}
+              sx={{ bgcolor: '#FFF8E1', color: '#E65100', fontWeight: 800, border: '1px solid #FFE082' }}
+            />
+            <Chip
+              label={`${trainInLevel} / 15 in Lvl ${trainLevel}`}
+              color="warning"
+              sx={{ fontWeight: 800 }}
+            />
+          </Box>
+        </Box>
+
+        <Box sx={{ width: '100%', mb: 2.5 }}>
+          <LinearProgress
+            variant="determinate"
+            value={Math.min(100, (trainInLevel / 15) * 100)}
+            sx={{
+              height: 12,
+              borderRadius: 6,
+              bgcolor: '#FFF8E1',
+              '& .MuiLinearProgress-bar': { bgcolor: '#FF9800', borderRadius: 6 },
+            }}
+          />
+        </Box>
+
+        {Object.keys(words).length > 0 ? (
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#4A5568', mb: 1.5 }}>
+              Words Practiced:
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {Object.entries(words).map(([word, stat]) => (
+                <Chip
+                  key={word}
+                  label={`${word} (${stat.correct}/${stat.total})`}
+                  color={stat.correct === stat.total ? 'success' : 'default'}
+                  variant="outlined"
+                  sx={{ fontWeight: 700, borderRadius: '12px' }}
+                />
+              ))}
+            </Box>
+          </Box>
+        ) : (
+          <Typography variant="body2" sx={{ color: '#718096', fontStyle: 'italic' }}>
+            No train words practiced yet. Hop on the Phonics Spelling Train in the Games Lobby! 🚂
+          </Typography>
+        )}
+      </Paper>
 
       {/* All Letter Sounds Grid */}
       <Paper className="glass-card" sx={{ p: 3, mb: 3 }}>
@@ -217,10 +289,10 @@ const ProgressDashboard = ({
           size="small"
           sx={{ borderRadius: '20px', fontWeight: 700 }}
         >
-          Reset Phonics Scores
+          Reset All Phonics Scores
         </Button>
         <Typography variant="caption" sx={{ color: '#A0AEC0', fontWeight: 600 }}>
-          System Version: <strong>v1.2.0</strong> • Audio Engine: Pre-recorded Human Phonics
+          System Version: <strong>v1.3.0</strong> • Audio Engine: Pre-recorded Human Phonics
         </Typography>
       </Box>
     </Box>

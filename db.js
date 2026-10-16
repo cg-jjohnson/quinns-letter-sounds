@@ -48,6 +48,27 @@ db.exec(`
     FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS word_spelling_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    word TEXT NOT NULL,
+    correct INTEGER NOT NULL DEFAULT 0,
+    total INTEGER NOT NULL DEFAULT 0,
+    last_practiced DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+    UNIQUE(profile_id, word)
+  );
+
+  CREATE TABLE IF NOT EXISTS train_game_progress (
+    profile_id INTEGER PRIMARY KEY,
+    level INTEGER NOT NULL DEFAULT 1,
+    correct_in_level INTEGER NOT NULL DEFAULT 0,
+    total_words_spelled INTEGER NOT NULL DEFAULT 0,
+    streak INTEGER NOT NULL DEFAULT 0,
+    best_streak INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+  );
+
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -65,7 +86,25 @@ if (!existingProfile) {
     INSERT INTO profile_progress (profile_id, level, streak, best_streak, correct_in_level)
     VALUES (?, 1, 0, 0, 0)
   `).run(profileId);
+
+  db.prepare(`
+    INSERT INTO train_game_progress (profile_id, level, correct_in_level, total_words_spelled, streak, best_streak)
+    VALUES (?, 1, 0, 0, 0, 0)
+  `).run(profileId);
 }
+
+// Ensure train_game_progress exists for all existing profiles
+const allProfiles = db.prepare('SELECT id FROM profiles').all();
+for (const p of allProfiles) {
+  const trainProg = db.prepare('SELECT profile_id FROM train_game_progress WHERE profile_id = ?').get(p.id);
+  if (!trainProg) {
+    db.prepare(`
+      INSERT INTO train_game_progress (profile_id, level, correct_in_level, total_words_spelled, streak, best_streak)
+      VALUES (?, 1, 0, 0, 0, 0)
+    `).run(p.id);
+  }
+}
+
 
 // Ensure default settings exist
 const getSetting = (k, defaultVal) => {

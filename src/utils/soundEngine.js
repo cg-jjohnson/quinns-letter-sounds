@@ -120,9 +120,37 @@ export function speakSuccessPraise() {
 export function speakIntro(gameType = 'balloons') {
   if (gameType === 'fishing') {
     playStaticAudio('intro_fishing', 'Listen closely and catch the fish with the matching letter sound!');
+  } else if (gameType === 'train') {
+    playStaticAudio('intro_train', 'Welcome to Phonics Train! Listen to the word, put the letter cars on the track, and pull the whistle to check!');
   } else {
     playStaticAudio('intro_balloons', 'Listen to the letter sound and pop the balloon that matches!');
   }
+}
+
+// -------------------------------------------------------------
+// 2B. PHONICS TRAIN SPELLING AUDIO
+// -------------------------------------------------------------
+
+export function speakWordSpellingPrompt(word) {
+  if (!word) return;
+  const wLower = word.toLowerCase();
+  playStaticAudio(`spell_${wLower}`, `Spell the word ${wLower}!`);
+}
+
+export function playTrainWhistle() {
+  playStaticAudio('train_whistle');
+}
+
+export function playTrainChug() {
+  playStaticAudio('train_chug');
+}
+
+export function playTrainWrongHint() {
+  playStaticAudio('hint_wrong', 'Almost there! Check the letters on your train cars and try again!');
+}
+
+export function playTrainLevelUp() {
+  playStaticAudio('level_up_train', 'All aboard! Great job, Quinn! You reached the next train level!');
 }
 
 // -------------------------------------------------------------

@@ -6,6 +6,7 @@ import GameLobby from './components/GameLobby';
 import PhonicsBalloonGame from './components/PhonicsBalloonGame';
 import PhonicsFishGame from './components/PhonicsFishGame';
 import PhonicsMatchGame from './components/PhonicsMatchGame';
+import PhonicsTrainGame from './components/PhonicsTrainGame';
 import ProgressDashboard from './components/ProgressDashboard';
 import ProfileModal from './components/ProfileModal';
 import LevelSelectorModal from './components/LevelSelectorModal';
@@ -14,13 +15,15 @@ import OrientationWarningOverlay from './components/OrientationWarningOverlay';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('game'); // 'game' | 'stats'
-  const [activeGame, setActiveGame] = useState('lobby'); // 'lobby' | 'balloons' | 'fishing' | 'matching'
+  const [activeGame, setActiveGame] = useState('lobby'); // 'lobby' | 'train' | 'balloons' | 'fishing' | 'matching'
   
   // Profile & State
   const [profiles, setProfiles] = useState([]);
   const [activeProfile, setActiveProfile] = useState({ id: 1, name: 'Quinn', avatar: '🦄' });
   const [progress, setProgress] = useState({ level: 1, streak: 0, best_streak: 0, correct_in_level: 0 });
+  const [trainProgress, setTrainProgress] = useState({ level: 1, correct_in_level: 0, total_words_spelled: 0, streak: 0, best_streak: 0 });
   const [stats, setStats] = useState({ letters: {} });
+  const [wordStats, setWordStats] = useState({ words: {} });
   const [settings, setSettings] = useState({ soundHintEnabled: true, scrambleOnWrong: false, letterCase: 'both' });
 
   // Modals
@@ -36,7 +39,9 @@ export default function App() {
         const data = await res.json();
         if (data.profile) setActiveProfile(data.profile);
         if (data.progress) setProgress(data.progress);
+        if (data.trainProgress) setTrainProgress(data.trainProgress);
         if (data.letters) setStats({ letters: data.letters });
+        if (data.words) setWordStats({ words: data.words });
         if (data.settings) setSettings(data.settings);
       }
     } catch (e) {
@@ -113,6 +118,47 @@ export default function App() {
     }
   };
 
+  // Handle Phonics Train Word Result
+  const handleRecordTrainResult = async (word, isCorrect, newLevel, newStreak, newCorrectInLevel) => {
+    const upperWord = word.toUpperCase();
+    const prevWordStat = wordStats.words[upperWord] || { correct: 0, total: 0 };
+    const updatedWordStat = {
+      correct: prevWordStat.correct + (isCorrect ? 1 : 0),
+      total: prevWordStat.total + 1,
+    };
+    const updatedWords = { ...wordStats.words, [upperWord]: updatedWordStat };
+    setWordStats({ words: updatedWords });
+
+    const newBest = Math.max(trainProgress.best_streak || 0, newStreak);
+    const newTotalWords = (trainProgress.total_words_spelled || 0) + (isCorrect ? 1 : 0);
+    const updatedTrainProg = {
+      ...trainProgress,
+      level: newLevel,
+      streak: newStreak,
+      best_streak: newBest,
+      correct_in_level: newCorrectInLevel,
+      total_words_spelled: newTotalWords,
+    };
+    setTrainProgress(updatedTrainProg);
+
+    try {
+      await fetch('/api/train/record', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: activeProfile.id,
+          word: upperWord,
+          isCorrect,
+          level: newLevel,
+          streak: newStreak,
+          correctInLevel: newCorrectInLevel,
+        }),
+      });
+    } catch (e) {
+      console.error('Failed to sync train stat to server', e);
+    }
+  };
+
   // Reset Stats
   const handleResetStats = async () => {
     if (!window.confirm('Reset all phonics scores for this player?')) return;
@@ -122,8 +168,15 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ profileId: activeProfile.id }),
       });
+      await fetch('/api/train/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId: activeProfile.id }),
+      });
       setStats({ letters: {} });
+      setWordStats({ words: {} });
       setProgress((p) => ({ ...p, streak: 0, best_streak: 0, correct_in_level: 0 }));
+      setTrainProgress((p) => ({ ...p, streak: 0, best_streak: 0, correct_in_level: 0 }));
     } catch (e) {
       console.error('Failed to reset stats', e);
     }
@@ -225,12 +278,23 @@ export default function App() {
               stats={stats}
               activeProfile={activeProfile}
               progress={progress}
+              trainProgress={trainProgress}
+              wordStats={wordStats}
               onResetStats={handleResetStats}
             />
           ) : activeGame === 'lobby' ? (
             <GameLobby
               onSelectGame={setActiveGame}
               activeProfile={activeProfile}
+            />
+          ) : activeGame === 'train' ? (
+            <PhonicsTrainGame
+              level={trainProgress.level || 1}
+              onRecordResult={handleRecordTrainResult}
+              stats={stats}
+              trainProgress={trainProgress}
+              activeProfile={activeProfile}
+              onBackToLobby={() => setActiveGame('lobby')}
             />
           ) : activeGame === 'balloons' ? (
             <PhonicsBalloonGame

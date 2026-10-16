@@ -40,10 +40,10 @@ if (fs.existsSync(distDir)) {
 app.get('/api/version', (req, res) => {
   res.json({
     app: "Quinn's Letter Sounds",
-    version: "1.2.0",
+    version: "1.3.0",
     audioEngine: "authentic-prerecorded-phonics",
     buildDate: "2026-10-16",
-    features: ["pure-human-phonics", "profile-tracking", "balloon-game", "fishing-game", "matching-game"]
+    features: ["pure-human-phonics", "profile-tracking", "balloon-game", "fishing-game", "matching-game", "train-spelling"]
   });
 });
 
@@ -80,10 +80,24 @@ app.get('/api/profiles/active', (req, res) => {
       correct_in_level: 0,
     };
 
+    const trainProgress = db.prepare('SELECT * FROM train_game_progress WHERE profile_id = ?').get(profile.id) || {
+      level: 1,
+      correct_in_level: 0,
+      total_words_spelled: 0,
+      streak: 0,
+      best_streak: 0,
+    };
+
     const statsRows = db.prepare('SELECT letter, correct, total FROM letter_sound_stats WHERE profile_id = ?').all(profile.id);
     const letters = {};
     for (const row of statsRows) {
       letters[row.letter] = { correct: row.correct, total: row.total };
+    }
+
+    const wordRows = db.prepare('SELECT word, correct, total FROM word_spelling_stats WHERE profile_id = ?').all(profile.id);
+    const words = {};
+    for (const row of wordRows) {
+      words[row.word] = { correct: row.correct, total: row.total };
     }
 
     const settingsRows = db.prepare('SELECT key, value FROM settings').all();
@@ -99,7 +113,9 @@ app.get('/api/profiles/active', (req, res) => {
     res.json({
       profile,
       progress,
+      trainProgress,
       letters,
+      words,
       settings,
     });
   } catch (err) {
@@ -129,6 +145,11 @@ app.post('/api/profiles', (req, res) => {
     db.prepare(`
       INSERT INTO profile_progress (profile_id, level, streak, best_streak, correct_in_level)
       VALUES (?, 1, 0, 0, 0)
+    `).run(newId);
+
+    db.prepare(`
+      INSERT INTO train_game_progress (profile_id, level, correct_in_level, total_words_spelled, streak, best_streak)
+      VALUES (?, 1, 0, 0, 0, 0)
     `).run(newId);
 
     const newProfile = db.prepare('SELECT * FROM profiles WHERE id = ?').get(newId);
@@ -242,6 +263,78 @@ app.post('/api/stats/reset', (req, res) => {
   } catch (err) {
     console.error('Error resetting stats:', err);
     res.status(500).json({ error: 'Failed to reset stats' });
+  }
+});
+
+// POST /api/train/record - Record train word spelling attempt
+app.post('/api/train/record', (req, res) => {
+  try {
+    const { profileId, word, isCorrect, level, streak, correctInLevel } = req.body;
+    if (!profileId || !word) {
+      return res.status(400).json({ error: 'profileId and word are required' });
+    }
+
+    const upperWord = word.trim().toUpperCase();
+
+    // 1. Update word_spelling_stats
+    const existing = db.prepare('SELECT correct, total FROM word_spelling_stats WHERE profile_id = ? AND word = ?').get(profileId, upperWord);
+    if (existing) {
+      const newCorrect = existing.correct + (isCorrect ? 1 : 0);
+      const newTotal = existing.total + 1;
+      db.prepare(`
+        UPDATE word_spelling_stats
+        SET correct = ?, total = ?, last_practiced = CURRENT_TIMESTAMP
+        WHERE profile_id = ? AND word = ?
+      `).run(newCorrect, newTotal, profileId, upperWord);
+    } else {
+      db.prepare(`
+        INSERT INTO word_spelling_stats (profile_id, word, correct, total)
+        VALUES (?, ?, ?, 1)
+      `).run(profileId, upperWord, isCorrect ? 1 : 0);
+    }
+
+    // 2. Update train_game_progress
+    const currentProg = db.prepare('SELECT * FROM train_game_progress WHERE profile_id = ?').get(profileId);
+    const currentBest = currentProg ? currentProg.best_streak : 0;
+    const newBest = Math.max(currentBest, streak || 0);
+    const prevTotalWords = currentProg ? currentProg.total_words_spelled : 0;
+    const newTotalWords = prevTotalWords + (isCorrect ? 1 : 0);
+
+    db.prepare(`
+      INSERT INTO train_game_progress (profile_id, level, correct_in_level, total_words_spelled, streak, best_streak)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(profile_id) DO UPDATE SET
+        level = excluded.level,
+        correct_in_level = excluded.correct_in_level,
+        total_words_spelled = excluded.total_words_spelled,
+        streak = excluded.streak,
+        best_streak = excluded.best_streak
+    `).run(profileId, level || 1, correctInLevel || 0, newTotalWords, streak || 0, newBest);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error recording train stats:', err);
+    res.status(500).json({ error: 'Failed to record train stats' });
+  }
+});
+
+// POST /api/train/reset - Reset train stats for a profile
+app.post('/api/train/reset', (req, res) => {
+  try {
+    const { profileId } = req.body;
+    if (!profileId) return res.status(400).json({ error: 'profileId required' });
+
+    db.prepare('DELETE FROM word_spelling_stats WHERE profile_id = ?').run(profileId);
+    db.prepare(`
+      UPDATE train_game_progress
+      SET streak = 0, best_streak = 0, correct_in_level = 0
+      WHERE profile_id = ?
+    `).run(profileId);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error resetting train stats:', err);
+    res.status(500).json({ error: 'Failed to reset train stats' });
   }
 });
 
