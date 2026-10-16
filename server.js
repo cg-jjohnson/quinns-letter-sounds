@@ -381,5 +381,5 @@ if (fs.existsSync(distDir)) {
 }
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Quinn's Letter Sounds v1.2.0 running on http://0.0.0.0:${PORT}`);
+  console.log(`🚀 Quinn's Letter Sounds v1.3.0 running on http://0.0.0.0:${PORT}`);
 });
