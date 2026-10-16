@@ -20,6 +20,7 @@ import confetti from 'canvas-confetti';
 import { TRAIN_LEVELS, getLevelConfig, getGradeForLevel } from '../utils/trainWordsData';
 import {
   speakWordSpellingPrompt,
+  speakWordPronunciation,
   speakShortSound,
   playTrainWhistle,
   playTrainChug,
@@ -51,6 +52,9 @@ const PhonicsTrainGame = ({
 
   // Train animation state: 'off-left' -> 'entering' -> 'station' -> 'exiting'
   const [trainStatus, setTrainStatus] = useState('off-left');
+  const [isCheckingWord, setIsCheckingWord] = useState(false);
+  const [soundingOutIndex, setSoundingOutIndex] = useState(-1);
+  const [isWordCompleteCelebrating, setIsWordCompleteCelebrating] = useState(false);
   const [wrongShake, setWrongShake] = useState(false);
   const [hintText, setHintText] = useState('');
   const [levelUpModalOpen, setLevelUpModalOpen] = useState(false);
@@ -103,6 +107,9 @@ const PhonicsTrainGame = ({
     setPlacedLetters([]);
     setHintText('');
     setWrongShake(false);
+    setIsCheckingWord(false);
+    setSoundingOutIndex(-1);
+    setIsWordCompleteCelebrating(false);
 
     // Enter Left Animation: Start off-screen left, then smoothly roll into the station
     setTrainStatus('off-left');
@@ -125,14 +132,14 @@ const PhonicsTrainGame = ({
   // Replay word sound
   const handleReplayPrompt = () => {
     playClickSound();
-    if (currentWordObj) {
+    if (currentWordObj && !isCheckingWord) {
       speakWordSpellingPrompt(currentWordObj.word);
     }
   };
 
   // Place letter onto track (click)
   const handleDockLetterClick = (letterItem) => {
-    if (trainStatus !== 'station' || letterItem.isPlaced) return;
+    if (trainStatus !== 'station' || isCheckingWord || letterItem.isPlaced) return;
     const targetLength = currentWordObj ? currentWordObj.word.length : 3;
     if (placedLetters.length >= targetLength) return;
 
@@ -148,7 +155,7 @@ const PhonicsTrainGame = ({
 
   // Remove letter from track back to dock (click)
   const handlePlacedLetterClick = (placedItem) => {
-    if (trainStatus !== 'station') return;
+    if (trainStatus !== 'station' || isCheckingWord) return;
     playClickSound();
     setPlacedLetters((prev) => prev.filter((item) => item.id !== placedItem.id));
     setDockLetters((prev) =>
@@ -160,7 +167,7 @@ const PhonicsTrainGame = ({
   // Hint button
   const handleHintClick = () => {
     playClickSound();
-    if (!currentWordObj) return;
+    if (!currentWordObj || isCheckingWord) return;
     const word = currentWordObj.word;
     const firstChar = word[0];
     speakShortSound(firstChar);
@@ -169,66 +176,91 @@ const PhonicsTrainGame = ({
 
   // Validate the spelled word (Whistle click or Enter key)
   const handleCheckWord = useCallback(() => {
-    if (trainStatus !== 'station' || !currentWordObj) return;
+    if (trainStatus !== 'station' || isCheckingWord || !currentWordObj) return;
 
     const spelled = placedLetters.map((l) => l.char).join('');
     const target = currentWordObj.word.toUpperCase();
 
     if (spelled === target) {
-      // SUCCESS!
-      // 1. Play realistic train whistle and chugachuga choo-choo departure audio
-      playTrainWhistle();
-      setTimeout(() => playTrainChug(), 350);
+      // 1. Lock input and start sounding out the word phonetically letter by letter!
+      setIsCheckingWord(true);
+      setWrongShake(false);
+      setHintText('');
 
-      // 2. Start moving slower off the screen to the right (exit right)
-      setTrainStatus('exiting');
+      const letterDelayMs = 520;
+      const targetLength = target.length;
 
-      confetti({
-        particleCount: 75,
-        spread: 85,
-        origin: { y: 0.6 },
-        colors: ['#FF4081', '#7C4DFF', '#00E676', '#FFD600', '#00B0FF'],
+      // Sequentially highlight each letter car and speak its authentic phonics sound
+      target.split('').forEach((char, idx) => {
+        setTimeout(() => {
+          setSoundingOutIndex(idx);
+          speakShortSound(char);
+        }, idx * letterDelayMs);
       });
 
-      const newStreak = streak + 1;
-      const newCorrectInLevel = correctInLevel + 1;
-      const newStars = stars + 1;
-      setStreak(newStreak);
-      setStars(newStars);
-
-      // Check level advancement (15 words required)
-      const required = levelConfig.requiredCorrect || 15;
-      let nextLevel = currentLevel;
-      let nextCorrectInLevel = newCorrectInLevel;
-
-      if (newCorrectInLevel >= required) {
-        nextLevel = Math.min(19, currentLevel + 1);
-        nextCorrectInLevel = 0;
-        setTimeout(() => {
-          setLevelUpModalOpen(true);
-          playTrainLevelUp();
-        }, 1600);
-      } else {
-        setTimeout(() => {
-          speakSuccessPraise();
-        }, 1200);
-      }
-
-      setCorrectInLevel(nextCorrectInLevel);
-
-      // Record to backend SQLite
-      if (onRecordResult) {
-        onRecordResult(currentWordObj.word, true, nextLevel, newStreak, nextCorrectInLevel);
-      }
-
-      // Next word enters from the left after train finishes pulling off
+      // Once all letters are sounded out, celebrate and SAY THE COMPLETE WORD!
+      const wordPronounceDelay = targetLength * letterDelayMs + 180;
       setTimeout(() => {
-        if (nextLevel !== currentLevel) {
-          setCurrentLevel(nextLevel);
-        } else {
-          setupWord(currentLevel);
+        setSoundingOutIndex(-1);
+        setIsWordCompleteCelebrating(true);
+
+        // Say the full word clearly (pre-recorded authentic pronunciation)
+        speakWordPronunciation(currentWordObj.word);
+
+        confetti({
+          particleCount: 90,
+          spread: 90,
+          origin: { y: 0.6 },
+          colors: ['#FF4081', '#7C4DFF', '#00E676', '#FFD600', '#00B0FF'],
+        });
+      }, wordPronounceDelay);
+
+      // After saying the word, blow the authentic steam whistle & rhythmic chugachuga, then roll off slowly!
+      const departureDelay = wordPronounceDelay + 1100;
+      setTimeout(() => {
+        // Authentic steam whistle + accelerating steam exhaust chuffs
+        playTrainChug();
+
+        // Slow departure transition to right (6.2 seconds)
+        setTrainStatus('exiting');
+
+        const newStreak = streak + 1;
+        const newCorrectInLevel = correctInLevel + 1;
+        const newStars = stars + 1;
+        setStreak(newStreak);
+        setStars(newStars);
+
+        // Check level advancement (15 words required)
+        const required = levelConfig.requiredCorrect || 15;
+        let nextLevel = currentLevel;
+        let nextCorrectInLevel = newCorrectInLevel;
+
+        if (newCorrectInLevel >= required) {
+          nextLevel = Math.min(19, currentLevel + 1);
+          nextCorrectInLevel = 0;
+          setTimeout(() => {
+            setLevelUpModalOpen(true);
+            playTrainLevelUp();
+          }, 2400);
         }
-      }, 3700);
+
+        setCorrectInLevel(nextCorrectInLevel);
+
+        // Record to backend SQLite
+        if (onRecordResult) {
+          onRecordResult(currentWordObj.word, true, nextLevel, newStreak, nextCorrectInLevel);
+        }
+
+        // Next word enters from the left after train finishes pulling off slowly
+        setTimeout(() => {
+          if (nextLevel !== currentLevel) {
+            setCurrentLevel(nextLevel);
+          } else {
+            setupWord(currentLevel);
+          }
+        }, 6400);
+      }, departureDelay);
+
     } else {
       // INCORRECT OR INCOMPLETE
       playTrainWrongHint();
@@ -242,10 +274,10 @@ const PhonicsTrainGame = ({
       if (placedLetters.length < target.length) {
         setHintText(`Keep going! Add all ${target.length} letters to finish the train!`);
       } else {
-        setHintText(`Check your letters! Click a car or press Backspace to change them!`);
+        setHintText(`Check your letters! Click a car or press Backspace to fix them!`);
       }
     }
-  }, [trainStatus, currentWordObj, placedLetters, streak, correctInLevel, stars, levelConfig, currentLevel, onRecordResult, setupWord]);
+  }, [trainStatus, isCheckingWord, currentWordObj, placedLetters, streak, correctInLevel, stars, levelConfig, currentLevel, onRecordResult, setupWord]);
 
   // Keyboard typing support:
   // - Letters A-Z: only available letters in dock, placed into first open slot
@@ -253,7 +285,7 @@ const PhonicsTrainGame = ({
   // - Enter: validates word
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (levelUpModalOpen || trainStatus !== 'station') return;
+      if (levelUpModalOpen || trainStatus !== 'station' || isCheckingWord) return;
 
       // Backspace / Delete: remove rightmost car
       if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -304,7 +336,7 @@ const PhonicsTrainGame = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dockLetters, placedLetters, currentWordObj, trainStatus, levelUpModalOpen, handleCheckWord]);
+  }, [dockLetters, placedLetters, currentWordObj, trainStatus, isCheckingWord, levelUpModalOpen, handleCheckWord]);
 
   const targetLength = currentWordObj ? currentWordObj.word.length : 3;
 
@@ -320,7 +352,8 @@ const PhonicsTrainGame = ({
     trainTransition = 'transform 2.0s cubic-bezier(0.12, 0.9, 0.2, 1.0)';
   } else if (trainStatus === 'exiting') {
     trainTransform = 'translateX(130vw)';
-    trainTransition = 'transform 3.6s cubic-bezier(0.35, 0.05, 0.15, 1)';
+    // Slow, realistic steam departure transition (6.2 seconds)
+    trainTransition = 'transform 6.2s cubic-bezier(0.25, 0.05, 0.1, 1)';
   }
 
   return (
@@ -440,6 +473,7 @@ const PhonicsTrainGame = ({
               color="secondary"
               startIcon={<VolumeUpIcon />}
               onClick={handleReplayPrompt}
+              disabled={isCheckingWord}
               sx={{
                 borderRadius: '24px',
                 px: 2.5,
@@ -454,6 +488,7 @@ const PhonicsTrainGame = ({
             <Tooltip title="Need a hint?">
               <IconButton
                 onClick={handleHintClick}
+                disabled={isCheckingWord}
                 sx={{ bgcolor: 'white', boxShadow: 1, color: '#FFB300', '&:hover': { bgcolor: '#FFFDE7' } }}
               >
                 <LightbulbIcon />
@@ -480,11 +515,13 @@ const PhonicsTrainGame = ({
                 variant="body1"
                 sx={{
                   fontWeight: 800,
-                  color: '#718096',
+                  color: isWordCompleteCelebrating ? '#2E7D32' : '#718096',
                   letterSpacing: '3px',
                 }}
               >
-                {Array(currentWordObj.word.length).fill('●').join(' ')}
+                {isWordCompleteCelebrating
+                  ? currentWordObj.word.toUpperCase()
+                  : Array(currentWordObj.word.length).fill('●').join(' ')}
               </Typography>
             </Box>
           )}
@@ -561,6 +598,7 @@ const PhonicsTrainGame = ({
             {Array.from({ length: targetLength }).map((_, index) => {
               const placed = placedLetters[index];
               const carColor = CAR_COLORS[index % CAR_COLORS.length];
+              const isSoundingOut = soundingOutIndex === index;
 
               return placed ? (
                 // Occupied Letter Train Car
@@ -577,19 +615,30 @@ const PhonicsTrainGame = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: 'white',
-                    boxShadow: '0 6px 12px rgba(0,0,0,0.15)',
+                    boxShadow: isSoundingOut
+                      ? '0 0 24px #FFD600, 0 8px 16px rgba(0,0,0,0.25)'
+                      : isWordCompleteCelebrating
+                      ? '0 0 18px #00E676, 0 6px 12px rgba(0,0,0,0.2)'
+                      : '0 6px 12px rgba(0,0,0,0.15)',
                     position: 'relative',
-                    cursor: 'pointer',
-                    transition: 'transform 0.15s',
-                    '&:hover': { transform: 'scale(1.05)' },
+                    cursor: isCheckingWord ? 'default' : 'pointer',
+                    transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    transform: isSoundingOut
+                      ? 'scale(1.18) translateY(-10px)'
+                      : isWordCompleteCelebrating
+                      ? 'scale(1.06)'
+                      : 'scale(1)',
+                    border: isSoundingOut ? '3px solid #FFF' : 'none',
+                    zIndex: isSoundingOut ? 10 : 1,
+                    '&:hover': { transform: isCheckingWord ? 'none' : 'scale(1.05)' },
                   }}
                 >
                   <Typography
                     sx={{
                       fontSize: { xs: '2rem', sm: '2.6rem' },
-                      fontWeight: 800,
+                      fontWeight: 900,
                       lineHeight: 1,
-                      textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                      textShadow: '0 2px 4px rgba(0,0,0,0.35)',
                     }}
                   >
                     {placed.char}
@@ -660,7 +709,9 @@ const PhonicsTrainGame = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: 'white',
-                boxShadow: '0 6px 14px rgba(0,0,0,0.25)',
+                boxShadow: isWordCompleteCelebrating
+                  ? '0 0 24px #FFD600, 0 6px 14px rgba(0,0,0,0.25)'
+                  : '0 6px 14px rgba(0,0,0,0.25)',
                 position: 'relative',
               }}
             >
@@ -683,10 +734,10 @@ const PhonicsTrainGame = ({
                     top: -16,
                     left: -2,
                     fontSize: '1.4rem',
-                    animation: trainStatus === 'exiting' ? 'fastSmoke 0.4s infinite' : 'slowSmoke 1.5s infinite',
+                    animation: trainStatus === 'exiting' ? 'fastSmoke 0.5s infinite' : 'slowSmoke 1.5s infinite',
                     '@keyframes fastSmoke': {
                       '0%': { transform: 'translateY(0) scale(0.6)', opacity: 0.9 },
-                      '100%': { transform: 'translateY(-24px) scale(1.6)', opacity: 0 },
+                      '100%': { transform: 'translateY(-28px) scale(1.8)', opacity: 0 },
                     },
                     '@keyframes slowSmoke': {
                       '0%': { transform: 'translateY(0) scale(0.8)', opacity: 0.8 },
@@ -752,7 +803,7 @@ const PhonicsTrainGame = ({
             variant="contained"
             color="success"
             size="large"
-            disabled={trainStatus !== 'station' || placedLetters.length === 0}
+            disabled={trainStatus !== 'station' || placedLetters.length === 0 || isCheckingWord}
             onClick={handleCheckWord}
             sx={{
               borderRadius: '28px',
@@ -762,7 +813,7 @@ const PhonicsTrainGame = ({
               fontSize: { xs: '1.1rem', sm: '1.3rem' },
               background: 'linear-gradient(45deg, #00E676 30%, #00C853 90%)',
               boxShadow: '0 6px 18px rgba(0, 230, 118, 0.4)',
-              transform: placedLetters.length === targetLength ? 'scale(1.04)' : 'none',
+              transform: placedLetters.length === targetLength && !isCheckingWord ? 'scale(1.04)' : 'none',
               transition: 'all 0.2s',
               '&:hover': {
                 transform: 'scale(1.08)',
@@ -770,7 +821,7 @@ const PhonicsTrainGame = ({
               },
             }}
           >
-            🚂💨 Toot! Check Word
+            {isCheckingWord ? '🔊 Sounding Out Word...' : '🚂💨 Toot! Check Word'}
           </Button>
         </Box>
       </Paper>
@@ -829,13 +880,13 @@ const PhonicsTrainGame = ({
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: isUsed ? 'rgba(0,0,0,0.2)' : 'white',
-                  cursor: isUsed || trainStatus !== 'station' ? 'default' : 'pointer',
+                  cursor: isUsed || trainStatus !== 'station' || isCheckingWord ? 'default' : 'pointer',
                   boxShadow: isUsed ? 'none' : '0 6px 14px rgba(0,0,0,0.18)',
                   border: isUsed ? '2px dashed rgba(0,0,0,0.15)' : 'none',
                   transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
                   transform: isUsed ? 'scale(0.92)' : 'scale(1)',
                   '&:hover': {
-                    transform: isUsed || trainStatus !== 'station' ? 'scale(0.92)' : 'scale(1.08)',
+                    transform: isUsed || trainStatus !== 'station' || isCheckingWord ? 'scale(0.92)' : 'scale(1.08)',
                   },
                 }}
               >
@@ -876,7 +927,7 @@ const PhonicsTrainGame = ({
           <Typography variant="h4" sx={{ fontWeight: 900, color: '#D97706' }}>
             All Aboard! 🚂⭐
           </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 800, color: '#2D3748' }}>
+          <Typography variant="h6" sx={{ fontWeight: 800, color: '#2D3436' }}>
             Level Complete!
           </Typography>
           <Typography variant="body1" sx={{ color: '#4A5568', fontWeight: 600 }}>

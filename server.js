@@ -40,7 +40,7 @@ if (fs.existsSync(distDir)) {
 app.get('/api/version', (req, res) => {
   res.json({
     app: "Quinn's Letter Sounds",
-    version: "1.3.1",
+    version: "1.3.2",
     audioEngine: "authentic-prerecorded-phonics",
     buildDate: "2026-10-16",
     features: ["pure-human-phonics", "profile-tracking", "balloon-game", "fishing-game", "matching-game", "train-spelling", "enter-left-exit-right", "keyboard-typing"]

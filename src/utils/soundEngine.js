@@ -137,6 +137,12 @@ export function speakWordSpellingPrompt(word) {
   playStaticAudio(`spell_${wLower}`, `Spell the word ${wLower}!`);
 }
 
+export function speakWordPronunciation(word) {
+  if (!word) return;
+  const wLower = word.toLowerCase();
+  playStaticAudio(`word_${wLower}`, `${wLower}!`);
+}
+
 export function playTrainWhistle() {
   playStaticAudio('train_whistle');
 }
