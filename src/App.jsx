@@ -264,12 +264,12 @@ export default function App() {
           onTabChange={setActiveTab}
           activeGame={activeGame}
           onGameChange={setActiveGame}
-          level={progress.level || 1}
+          level={activeGame === 'train' ? (trainProgress.level || 1) : (progress.level || 1)}
           onOpenLevelSelector={() => setIsLevelModalOpen(true)}
           onOpenProfileModal={() => setIsProfileModalOpen(true)}
           onOpenAdminPanel={() => setIsAdminModalOpen(true)}
           activeProfile={activeProfile}
-          streak={progress.streak || 0}
+          streak={activeGame === 'train' ? (trainProgress.streak || 0) : (progress.streak || 0)}
         />
 
         <Container maxWidth="lg" sx={{ flexGrow: 1, py: { xs: 1, sm: 2 } }}>
@@ -338,8 +338,36 @@ export default function App() {
         <LevelSelectorModal
           open={isLevelModalOpen}
           onClose={() => setIsLevelModalOpen(false)}
-          currentLevel={progress.level || 1}
-          onSelectLevel={(lvl) => setProgress((p) => ({ ...p, level: lvl }))}
+          gameType={activeGame}
+          currentLevel={activeGame === 'train' ? (trainProgress.level || 1) : (progress.level || 1)}
+          onSelectLevel={(lvl) => {
+            if (activeGame === 'train') {
+              setTrainProgress((p) => ({ ...p, level: lvl, correct_in_level: 0 }));
+              if (activeProfile?.id) {
+                fetch(`/api/profiles/${activeProfile.id}/progress/train`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    level: lvl,
+                    streak: trainProgress.streak || 0,
+                    correct_in_level: 0,
+                  }),
+                }).catch(() => {});
+              }
+            } else {
+              setProgress((p) => ({ ...p, level: lvl }));
+              if (activeProfile?.id) {
+                fetch(`/api/profiles/${activeProfile.id}/progress`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    level: lvl,
+                    streak: progress.streak || 0,
+                  }),
+                }).catch(() => {});
+              }
+            }
+          }}
         />
 
         <AdminPanelModal

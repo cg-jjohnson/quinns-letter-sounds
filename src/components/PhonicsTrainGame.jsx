@@ -5,7 +5,6 @@ import {
   Paper,
   Button,
   Chip,
-  LinearProgress,
   IconButton,
   Tooltip,
   Dialog,
@@ -16,6 +15,7 @@ import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import StarIcon from '@mui/icons-material/Star';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import KeyboardIcon from '@mui/icons-material/Keyboard';
 import confetti from 'canvas-confetti';
 import { TRAIN_LEVELS, getLevelConfig, getGradeForLevel } from '../utils/trainWordsData';
 import {
@@ -27,7 +27,6 @@ import {
   playTrainLevelUp,
   playClickSound,
   speakSuccessPraise,
-  playCheerSound,
 } from '../utils/soundEngine';
 
 const CAR_COLORS = ['#FF4081', '#7C4DFF', '#00E676', '#FFD600', '#FF9100', '#00B0FF', '#E040FB'];
@@ -50,12 +49,18 @@ const PhonicsTrainGame = ({
   const [dockLetters, setDockLetters] = useState([]); // array of { id, char, isPlaced }
   const [placedLetters, setPlacedLetters] = useState([]); // array of { id, char }
 
-  // Game UI state
-  const [isDrivingOff, setIsDrivingOff] = useState(false);
-  const [isEntering, setIsEntering] = useState(false);
+  // Train animation state: 'off-left' -> 'entering' -> 'station' -> 'exiting'
+  const [trainStatus, setTrainStatus] = useState('off-left');
   const [wrongShake, setWrongShake] = useState(false);
   const [hintText, setHintText] = useState('');
   const [levelUpModalOpen, setLevelUpModalOpen] = useState(false);
+
+  // Keep in sync with external level updates (e.g. from navbar level selector)
+  useEffect(() => {
+    if (trainProgress.level && trainProgress.level !== currentLevel) {
+      setCurrentLevel(trainProgress.level);
+    }
+  }, [trainProgress.level]);
 
   const levelConfig = getLevelConfig(currentLevel);
 
@@ -98,13 +103,18 @@ const PhonicsTrainGame = ({
     setPlacedLetters([]);
     setHintText('');
     setWrongShake(false);
-    setIsDrivingOff(false);
-    setIsEntering(true);
 
+    // Enter Left Animation: Start off-screen left, then smoothly roll into the station
+    setTrainStatus('off-left');
     setTimeout(() => {
-      setIsEntering(false);
+      setTrainStatus('entering');
+    }, 40);
+
+    // Once arrived at station, play spoken prompt
+    setTimeout(() => {
+      setTrainStatus('station');
       speakWordSpellingPrompt(randomWordObj.word);
-    }, 600);
+    }, 2050);
   }, []);
 
   // Initialize word on mount and when level changes
@@ -112,7 +122,7 @@ const PhonicsTrainGame = ({
     setupWord(currentLevel);
   }, [currentLevel, setupWord]);
 
-  // Play word sound
+  // Replay word sound
   const handleReplayPrompt = () => {
     playClickSound();
     if (currentWordObj) {
@@ -120,9 +130,9 @@ const PhonicsTrainGame = ({
     }
   };
 
-  // Place letter onto track
+  // Place letter onto track (click)
   const handleDockLetterClick = (letterItem) => {
-    if (isDrivingOff || letterItem.isPlaced) return;
+    if (trainStatus !== 'station' || letterItem.isPlaced) return;
     const targetLength = currentWordObj ? currentWordObj.word.length : 3;
     if (placedLetters.length >= targetLength) return;
 
@@ -136,9 +146,9 @@ const PhonicsTrainGame = ({
     setHintText('');
   };
 
-  // Remove letter from track back to dock
+  // Remove letter from track back to dock (click)
   const handlePlacedLetterClick = (placedItem) => {
-    if (isDrivingOff) return;
+    if (trainStatus !== 'station') return;
     playClickSound();
     setPlacedLetters((prev) => prev.filter((item) => item.id !== placedItem.id));
     setDockLetters((prev) =>
@@ -147,32 +157,35 @@ const PhonicsTrainGame = ({
     setWrongShake(false);
   };
 
-  // Give gentle clue
+  // Hint button
   const handleHintClick = () => {
     playClickSound();
     if (!currentWordObj) return;
     const word = currentWordObj.word;
     const firstChar = word[0];
     speakShortSound(firstChar);
-    setHintText(`Hint: ${currentWordObj.hint} Starts with "${firstChar}"!`);
+    setHintText(`Hint: ${currentWordObj.hint} Starts with the sound of "${firstChar}"!`);
   };
 
-  // Validate the spelled word (Whistle click)
-  const handleCheckWord = () => {
-    if (isDrivingOff || !currentWordObj) return;
+  // Validate the spelled word (Whistle click or Enter key)
+  const handleCheckWord = useCallback(() => {
+    if (trainStatus !== 'station' || !currentWordObj) return;
 
     const spelled = placedLetters.map((l) => l.char).join('');
     const target = currentWordObj.word.toUpperCase();
 
     if (spelled === target) {
       // SUCCESS!
+      // 1. Play realistic train whistle and chugachuga choo-choo departure audio
       playTrainWhistle();
       setTimeout(() => playTrainChug(), 350);
-      setIsDrivingOff(true);
+
+      // 2. Start moving slower off the screen to the right (exit right)
+      setTrainStatus('exiting');
 
       confetti({
-        particleCount: 70,
-        spread: 80,
+        particleCount: 75,
+        spread: 85,
         origin: { y: 0.6 },
         colors: ['#FF4081', '#7C4DFF', '#00E676', '#FFD600', '#00B0FF'],
       });
@@ -183,7 +196,7 @@ const PhonicsTrainGame = ({
       setStreak(newStreak);
       setStars(newStars);
 
-      // Check level advancement (15 words correct)
+      // Check level advancement (15 words required)
       const required = levelConfig.requiredCorrect || 15;
       let nextLevel = currentLevel;
       let nextCorrectInLevel = newCorrectInLevel;
@@ -194,11 +207,11 @@ const PhonicsTrainGame = ({
         setTimeout(() => {
           setLevelUpModalOpen(true);
           playTrainLevelUp();
-        }, 1200);
+        }, 1600);
       } else {
         setTimeout(() => {
           speakSuccessPraise();
-        }, 1000);
+        }, 1200);
       }
 
       setCorrectInLevel(nextCorrectInLevel);
@@ -208,14 +221,14 @@ const PhonicsTrainGame = ({
         onRecordResult(currentWordObj.word, true, nextLevel, newStreak, nextCorrectInLevel);
       }
 
-      // Next word after driving off
+      // Next word enters from the left after train finishes pulling off
       setTimeout(() => {
         if (nextLevel !== currentLevel) {
           setCurrentLevel(nextLevel);
         } else {
           setupWord(currentLevel);
         }
-      }, 2600);
+      }, 3700);
     } else {
       // INCORRECT OR INCOMPLETE
       playTrainWrongHint();
@@ -229,12 +242,86 @@ const PhonicsTrainGame = ({
       if (placedLetters.length < target.length) {
         setHintText(`Keep going! Add all ${target.length} letters to finish the train!`);
       } else {
-        setHintText(`Check your letters! Click a car to return it and try again!`);
+        setHintText(`Check your letters! Click a car or press Backspace to change them!`);
       }
     }
-  };
+  }, [trainStatus, currentWordObj, placedLetters, streak, correctInLevel, stars, levelConfig, currentLevel, onRecordResult, setupWord]);
+
+  // Keyboard typing support:
+  // - Letters A-Z: only available letters in dock, placed into first open slot
+  // - Backspace / Delete: removes rightmost placed letter
+  // - Enter: validates word
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (levelUpModalOpen || trainStatus !== 'station') return;
+
+      // Backspace / Delete: remove rightmost car
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        e.preventDefault();
+        setPlacedLetters((prev) => {
+          if (prev.length === 0) return prev;
+          const lastPlaced = prev[prev.length - 1];
+          playClickSound();
+          setDockLetters((dock) =>
+            dock.map((item) => (item.id === lastPlaced.id ? { ...item, isPlaced: false } : item))
+          );
+          return prev.slice(0, prev.length - 1);
+        });
+        setWrongShake(false);
+        return;
+      }
+
+      // Enter: blow whistle / check word
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleCheckWord();
+        return;
+      }
+
+      // Letters A-Z
+      const keyUpper = e.key.toUpperCase();
+      if (/^[A-Z]$/.test(keyUpper)) {
+        const targetLen = currentWordObj ? currentWordObj.word.length : 3;
+        if (placedLetters.length >= targetLen) return;
+
+        // Find matching letter in dock that is not yet placed
+        const availableItem = dockLetters.find(
+          (item) => !item.isPlaced && item.char === keyUpper
+        );
+
+        if (availableItem) {
+          e.preventDefault();
+          speakShortSound(availableItem.char);
+          setDockLetters((prev) =>
+            prev.map((item) => (item.id === availableItem.id ? { ...item, isPlaced: true } : item))
+          );
+          setPlacedLetters((prev) => [...prev, availableItem]);
+          setWrongShake(false);
+          setHintText('');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [dockLetters, placedLetters, currentWordObj, trainStatus, levelUpModalOpen, handleCheckWord]);
 
   const targetLength = currentWordObj ? currentWordObj.word.length : 3;
+
+  // Compute CSS transform and transition based on train animation state
+  let trainTransform = 'translateX(0)';
+  let trainTransition = 'none';
+
+  if (trainStatus === 'off-left') {
+    trainTransform = 'translateX(-120vw)';
+    trainTransition = 'none';
+  } else if (trainStatus === 'entering') {
+    trainTransform = 'translateX(0)';
+    trainTransition = 'transform 2.0s cubic-bezier(0.12, 0.9, 0.2, 1.0)';
+  } else if (trainStatus === 'exiting') {
+    trainTransform = 'translateX(130vw)';
+    trainTransition = 'transform 3.6s cubic-bezier(0.35, 0.05, 0.15, 1)';
+  }
 
   return (
     <Box
@@ -336,7 +423,7 @@ const PhonicsTrainGame = ({
           border: '3px solid #81D4FA',
         }}
       >
-        {/* Sky Header: Word Prompt & Audio Controls */}
+        {/* Sky Header: Word Audio Controls & Mystery Icon (NO WORD TEXT DISPLAYED) */}
         <Box
           sx={{
             display: 'flex',
@@ -362,7 +449,7 @@ const PhonicsTrainGame = ({
                 boxShadow: '0 4px 14px rgba(124, 77, 255, 0.4)',
               }}
             >
-              Hear Word
+              Hear Word 🔊
             </Button>
             <Tooltip title="Need a hint?">
               <IconButton
@@ -374,7 +461,7 @@ const PhonicsTrainGame = ({
             </Tooltip>
           </Box>
 
-          {/* Current Word & Clue */}
+          {/* Picture Clue & Length Mystery Dots — (WORD IS NOT DISPLAYED TO PREVENT CHEATING) */}
           {currentWordObj && (
             <Box
               sx={{
@@ -390,15 +477,14 @@ const PhonicsTrainGame = ({
             >
               <Typography sx={{ fontSize: '1.8rem', lineHeight: 1 }}>{currentWordObj.emoji}</Typography>
               <Typography
-                variant="h6"
+                variant="body1"
                 sx={{
                   fontWeight: 800,
-                  color: '#2D3748',
-                  letterSpacing: '2px',
-                  fontSize: { xs: '1.1rem', sm: '1.3rem' },
+                  color: '#718096',
+                  letterSpacing: '3px',
                 }}
               >
-                {currentWordObj.word}
+                {Array(currentWordObj.word.length).fill('●').join(' ')}
               </Typography>
             </Box>
           )}
@@ -461,16 +547,8 @@ const PhonicsTrainGame = ({
               alignItems: 'flex-end',
               justifyContent: 'center',
               gap: 1,
-              transition: isDrivingOff
-                ? 'transform 2.2s cubic-bezier(0.25, 1, 0.5, 1)'
-                : isEntering
-                ? 'transform 0.5s ease-out'
-                : 'none',
-              transform: isDrivingOff
-                ? 'translateX(130vw)'
-                : isEntering
-                ? 'translateX(-100vw)'
-                : 'translateX(0)',
+              transition: trainTransition,
+              transform: trainTransform,
               animation: wrongShake ? 'shake 0.5s' : 'none',
               '@keyframes shake': {
                 '0%, 100%': { transform: 'translateX(0)' },
@@ -582,37 +660,67 @@ const PhonicsTrainGame = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: 'white',
-                boxShadow: '0 6px 12px rgba(0,0,0,0.25)',
+                boxShadow: '0 6px 14px rgba(0,0,0,0.25)',
                 position: 'relative',
-                ml: 0.5,
               }}
             >
-              <Typography sx={{ fontSize: { xs: '2rem', sm: '2.5rem' }, lineHeight: 1 }}>🚂</Typography>
-
-              {/* Steam Puffs */}
+              {/* Smokestack & Animated Steam */}
               <Box
                 sx={{
                   position: 'absolute',
-                  top: -18,
+                  top: -24,
                   right: 18,
-                  fontSize: '1.3rem',
-                  animation: 'steamFloat 1.8s infinite',
-                  '@keyframes steamFloat': {
-                    '0%': { transform: 'translateY(0) scale(0.8)', opacity: 0.8 },
-                    '100%': { transform: 'translateY(-20px) scale(1.4)', opacity: 0 },
-                  },
+                  width: 18,
+                  height: 24,
+                  bgcolor: '#37474F',
+                  borderRadius: '4px 4px 0 0',
                 }}
               >
-                💨
+                {/* Steam Puff Animation */}
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: -16,
+                    left: -2,
+                    fontSize: '1.4rem',
+                    animation: trainStatus === 'exiting' ? 'fastSmoke 0.4s infinite' : 'slowSmoke 1.5s infinite',
+                    '@keyframes fastSmoke': {
+                      '0%': { transform: 'translateY(0) scale(0.6)', opacity: 0.9 },
+                      '100%': { transform: 'translateY(-24px) scale(1.6)', opacity: 0 },
+                    },
+                    '@keyframes slowSmoke': {
+                      '0%': { transform: 'translateY(0) scale(0.8)', opacity: 0.8 },
+                      '100%': { transform: 'translateY(-14px) scale(1.2)', opacity: 0 },
+                    },
+                  }}
+                >
+                  💨
+                </Box>
               </Box>
 
-              {/* Engine Wheels */}
+              {/* Locomotive Cab Window & Headlight */}
+              <Box
+                sx={{
+                  width: 28,
+                  height: 26,
+                  bgcolor: '#FFE082',
+                  border: '2px solid #5D4037',
+                  borderRadius: 2,
+                  mb: 0.5,
+                  boxShadow: 'inset 0 0 4px rgba(0,0,0,0.3)',
+                }}
+              />
+              <Typography sx={{ fontSize: '0.8rem', fontWeight: 800, letterSpacing: 0.5 }}>
+                CHO-CHO
+              </Typography>
+
+              {/* Locomotive Wheels */}
               <Box
                 sx={{
                   position: 'absolute',
                   bottom: -12,
                   display: 'flex',
-                  gap: { xs: 2, sm: 2.8 },
+                  gap: 1.5,
                 }}
               >
                 <Box
@@ -621,16 +729,16 @@ const PhonicsTrainGame = ({
                     height: 22,
                     borderRadius: '50%',
                     bgcolor: '#212121',
-                    border: '3px solid #FFD600',
+                    border: '3px solid #ECEFF1',
                   }}
                 />
                 <Box
                   sx={{
-                    width: 22,
-                    height: 22,
+                    width: 26,
+                    height: 26,
                     borderRadius: '50%',
-                    bgcolor: '#212121',
-                    border: '3px solid #FFD600',
+                    bgcolor: '#D32F2F',
+                    border: '3px solid #FFF',
                   }}
                 />
               </Box>
@@ -638,187 +746,160 @@ const PhonicsTrainGame = ({
           </Box>
         </Box>
 
-        {/* Validation Whistle Button */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 1, zIndex: 2 }}>
+        {/* Whistle Validation Button */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', zIndex: 2, mt: 1 }}>
           <Button
             variant="contained"
+            color="success"
+            size="large"
+            disabled={trainStatus !== 'station' || placedLetters.length === 0}
             onClick={handleCheckWord}
-            disabled={isDrivingOff || placedLetters.length === 0}
             sx={{
-              background: 'linear-gradient(45deg, #FF9100, #FF3D00)',
-              color: 'white',
+              borderRadius: '28px',
               px: { xs: 3, sm: 5 },
-              py: { xs: 1.2, sm: 1.6 },
-              borderRadius: '30px',
-              fontSize: { xs: '1.1rem', sm: '1.35rem' },
-              fontWeight: 800,
-              boxShadow: '0 6px 20px rgba(255, 61, 0, 0.4)',
-              textTransform: 'none',
-              display: 'flex',
-              gap: 1.5,
-              alignItems: 'center',
+              py: 1.5,
+              fontWeight: 900,
+              fontSize: { xs: '1.1rem', sm: '1.3rem' },
+              background: 'linear-gradient(45deg, #00E676 30%, #00C853 90%)',
+              boxShadow: '0 6px 18px rgba(0, 230, 118, 0.4)',
+              transform: placedLetters.length === targetLength ? 'scale(1.04)' : 'none',
+              transition: 'all 0.2s',
               '&:hover': {
-                background: 'linear-gradient(45deg, #FF6D00, #DD2C00)',
-                transform: 'scale(1.03)',
+                transform: 'scale(1.08)',
+                background: 'linear-gradient(45deg, #00C853 30%, #00B0FF 90%)',
               },
             }}
           >
-            <span>🚂💨</span>
-            <span>Blow Whistle to Check!</span>
+            🚂💨 Toot! Check Word
           </Button>
         </Box>
       </Paper>
 
-      {/* THE LETTER DOCK (BOTTOM) */}
+      {/* Station Platform Dock (Available Letters) */}
       <Box
         sx={{
           width: '100%',
-          mt: 3,
-          p: { xs: 2, sm: 3 },
+          mt: 2.5,
+          p: { xs: 2, sm: 2.5 },
           bgcolor: 'white',
           borderRadius: 4,
-          boxShadow: '0 4px 15px rgba(0,0,0,0.06)',
-          border: '2px solid #E2E8F0',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+          border: '2px solid rgba(0,0,0,0.06)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
         }}
       >
-        <Typography
-          variant="subtitle1"
-          sx={{
-            fontWeight: 800,
-            color: '#4A5568',
-            mb: 2,
-            textAlign: 'center',
-            fontSize: { xs: '1rem', sm: '1.15rem' },
-          }}
-        >
-          {levelConfig.mode === 'ordered'
-            ? '👉 Tap each letter car in order to build your train!'
-            : '👉 Tap the letters to put them on your train track!'}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', mb: 1.5 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#2D3748' }}>
+            Station Letter Cars 🚉 (Click or Type)
+          </Typography>
+          <Chip
+            icon={<KeyboardIcon fontSize="small" />}
+            label="Type or Click!"
+            size="small"
+            sx={{ bgcolor: '#EDF2F7', fontWeight: 700, color: '#4A5568' }}
+          />
+        </Box>
 
         <Box
           sx={{
             display: 'flex',
             flexWrap: 'wrap',
+            gap: { xs: 1.5, sm: 2 },
             justifyContent: 'center',
-            gap: { xs: 1.5, sm: 2.5 },
+            alignItems: 'center',
+            minHeight: 90,
           }}
         >
-          {dockLetters.map((item, index) => {
-            const carColor = CAR_COLORS[index % CAR_COLORS.length];
+          {dockLetters.map((item, idx) => {
+            const isUsed = item.isPlaced;
+            const carColor = CAR_COLORS[idx % CAR_COLORS.length];
 
             return (
               <Box
                 key={item.id}
                 onClick={() => handleDockLetterClick(item)}
                 sx={{
-                  width: { xs: 64, sm: 78 },
-                  height: { xs: 72, sm: 88 },
-                  bgcolor: item.isPlaced ? '#CFD8DC' : carColor,
-                  opacity: item.isPlaced ? 0.35 : 1,
-                  borderRadius: '12px 12px 4px 4px',
+                  width: { xs: 68, sm: 82 },
+                  height: { xs: 74, sm: 90 },
+                  bgcolor: isUsed ? 'rgba(0,0,0,0.06)' : carColor,
+                  borderRadius: '14px',
                   display: 'flex',
-                  flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: 'white',
-                  cursor: item.isPlaced ? 'default' : 'pointer',
-                  boxShadow: item.isPlaced ? 'none' : '0 6px 14px rgba(0,0,0,0.15)',
-                  position: 'relative',
-                  transform: item.isPlaced ? 'scale(0.92)' : 'scale(1)',
+                  color: isUsed ? 'rgba(0,0,0,0.2)' : 'white',
+                  cursor: isUsed || trainStatus !== 'station' ? 'default' : 'pointer',
+                  boxShadow: isUsed ? 'none' : '0 6px 14px rgba(0,0,0,0.18)',
+                  border: isUsed ? '2px dashed rgba(0,0,0,0.15)' : 'none',
                   transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  transform: isUsed ? 'scale(0.92)' : 'scale(1)',
                   '&:hover': {
-                    transform: item.isPlaced ? 'none' : 'scale(1.08) translateY(-4px)',
+                    transform: isUsed || trainStatus !== 'station' ? 'scale(0.92)' : 'scale(1.08)',
                   },
                 }}
               >
                 <Typography
                   sx={{
-                    fontSize: { xs: '2rem', sm: '2.5rem' },
-                    fontWeight: 800,
+                    fontSize: { xs: '2.2rem', sm: '2.8rem' },
+                    fontWeight: 900,
                     lineHeight: 1,
-                    textShadow: item.isPlaced ? 'none' : '0 2px 4px rgba(0,0,0,0.25)',
+                    textShadow: isUsed ? 'none' : '0 2px 4px rgba(0,0,0,0.3)',
                   }}
                 >
                   {item.char}
                 </Typography>
-
-                {/* Dock Wheels */}
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    bottom: -8,
-                    display: 'flex',
-                    gap: { xs: 2.2, sm: 3 },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: 14,
-                      height: 14,
-                      borderRadius: '50%',
-                      bgcolor: '#37474F',
-                      border: '2px solid #ECEFF1',
-                    }}
-                  />
-                  <Box
-                    sx={{
-                      width: 14,
-                      height: 14,
-                      borderRadius: '50%',
-                      bgcolor: '#37474F',
-                      border: '2px solid #ECEFF1',
-                    }}
-                  />
-                </Box>
               </Box>
             );
           })}
         </Box>
       </Box>
 
-      {/* LEVEL UP MODAL */}
+      {/* Level Up Celebration Dialog */}
       <Dialog
         open={levelUpModalOpen}
         onClose={() => setLevelUpModalOpen(false)}
+        maxWidth="xs"
+        fullWidth
         PaperProps={{
           sx: {
-            borderRadius: 5,
-            p: 3,
+            borderRadius: '28px',
+            p: 2,
             textAlign: 'center',
-            maxWidth: 420,
-            background: 'linear-gradient(135deg, #FFFDE7 0%, #FFF8E1 100%)',
+            background: 'linear-gradient(135deg, #FFFDE7 0%, #FFFFFF 100%)',
+            border: '4px solid #FFD600',
           },
         }}
       >
-        <DialogContent sx={{ p: 2 }}>
-          <Typography sx={{ fontSize: '4rem', mb: 1 }}>🚂🎉</Typography>
-          <Typography variant="h4" sx={{ fontWeight: 800, color: '#FF6D00', mb: 1 }}>
-            Level Up!
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <EmojiEventsIcon sx={{ fontSize: '5rem', color: '#FFD600', animation: 'bounce 1s infinite' }} />
+          <Typography variant="h4" sx={{ fontWeight: 900, color: '#D97706' }}>
+            All Aboard! 🚂⭐
           </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: '#37474F', mb: 2 }}>
-            Quinn unlocked Level {currentLevel}!
+          <Typography variant="h6" sx={{ fontWeight: 800, color: '#2D3748' }}>
+            Level Complete!
           </Typography>
-          <Typography variant="body1" sx={{ color: '#546E7A', mb: 3 }}>
-            You spelled 15 words correctly! You are a super speller!
+          <Typography variant="body1" sx={{ color: '#4A5568', fontWeight: 600 }}>
+            Awesome job spelling 15 words! You've advanced to Level {currentLevel}!
           </Typography>
           <Button
             variant="contained"
             color="primary"
             size="large"
-            onClick={() => setLevelUpModalOpen(false)}
+            onClick={() => {
+              playClickSound();
+              setLevelUpModalOpen(false);
+            }}
             sx={{
-              borderRadius: '25px',
-              fontWeight: 800,
-              fontSize: '1.1rem',
+              borderRadius: '24px',
               px: 4,
               py: 1.2,
+              fontWeight: 800,
+              fontSize: '1.1rem',
+              mt: 1,
             }}
           >
-            Keep Chugging! 🚂
+            Keep Chugging! 🚀
           </Button>
         </DialogContent>
       </Dialog>

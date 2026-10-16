@@ -13,6 +13,7 @@ import HomeIcon from '@mui/icons-material/Home';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import TuneIcon from '@mui/icons-material/Tune';
 import StarIcon from '@mui/icons-material/Star';
+import TrainIcon from '@mui/icons-material/Train';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
@@ -175,18 +176,24 @@ const NavBar = ({
             />
           )}
 
-          <Tooltip title="Select Level">
+          <Tooltip title={activeGame === 'train' ? 'Select Train Level' : 'Select Phonics Level'}>
             <Chip
-              icon={<StarIcon sx={{ color: '#FFC107 !important' }} />}
-              label={`Lvl ${level}`}
+              icon={
+                activeGame === 'train' ? (
+                  <TrainIcon sx={{ color: '#00E676 !important' }} />
+                ) : (
+                  <StarIcon sx={{ color: '#FFC107 !important' }} />
+                )
+              }
+              label={activeGame === 'train' ? `Train Lvl ${level}` : `Lvl ${level}`}
               onClick={onOpenLevelSelector}
               clickable
               size="small"
               sx={{
-                bgcolor: '#FFFDE7',
-                color: '#F57F17',
+                bgcolor: activeGame === 'train' ? '#E8F5E9' : '#FFFDE7',
+                color: activeGame === 'train' ? '#2E7D32' : '#F57F17',
                 fontWeight: 800,
-                border: '1px solid #FFF59D',
+                border: activeGame === 'train' ? '1px solid #A5D6A7' : '1px solid #FFF59D',
               }}
             />
           </Tooltip>
