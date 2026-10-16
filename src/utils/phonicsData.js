@@ -22,7 +22,7 @@ export const PHONICS_DATA = {
   U: { letter: 'U', sound: 'uh', word: 'Umbrella', emoji: '☂️', color: '#AB47BC', prompt: 'Which letter makes the uh sound, as in Umbrella?' },
   V: { letter: 'V', sound: 'vvv', word: 'Violin', emoji: '🎻', color: '#66BB6A', prompt: 'Which letter makes the vvv sound, as in Violin?' },
   W: { letter: 'W', sound: 'wuh', word: 'Watermelon', emoji: '🍉', color: '#EF5350', prompt: 'Which letter makes the wuh sound, as in Watermelon?' },
-  X: { letter: 'X', sound: 'kss', word: 'Fox', emoji: '🦊', color: '#FFA726', prompt: 'Which letter makes the kss sound, as in Fox?' },
+  X: { letter: 'X', sound: 'ks', word: 'Fox', emoji: '🦊', color: '#FFA726', prompt: 'Which letter makes the sound at the end of Fox and Box?' },
   Y: { letter: 'Y', sound: 'yuh', word: 'Yo-yo', emoji: '🪀', color: '#26A69A', prompt: 'Which letter makes the yuh sound, as in Yo-yo?' },
   Z: { letter: 'Z', sound: 'zzz', word: 'Zebra', emoji: '🦓', color: '#7E57C2', prompt: 'Which letter makes the zzz sound, as in Zebra?' },
 };

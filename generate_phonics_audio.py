@@ -173,14 +173,117 @@ def generate_clip(text, base_name):
     if os.path.exists(aiff_path):
         os.remove(aiff_path)
 
+AUTHENTIC_PHONEMES_DIR = os.path.join(os.path.dirname(__file__), "assets", "phonemes")
+AUTHENTIC_MAP = {
+    "M": {"word": "Monkey", "file": os.path.join(AUTHENTIC_PHONEMES_DIR, "m.m4a"), "gain": 5.0, "is_x": False},
+    "N": {"word": "Nest", "file": os.path.join(AUTHENTIC_PHONEMES_DIR, "n.m4a"), "gain": 5.0, "is_x": False},
+    "V": {"word": "Volcano", "file": os.path.join(AUTHENTIC_PHONEMES_DIR, "v.m4a"), "gain": 6.5, "is_x": False},
+    "R": {"word": "Rainbow", "file": os.path.join(AUTHENTIC_PHONEMES_DIR, "r.m4a"), "gain": 5.5, "is_x": False},
+    "X": {"word": "Fox", "file": os.path.join(AUTHENTIC_PHONEMES_DIR, "x.m4a"), "gain": 12.0, "is_x": True},
+}
+
+import struct
+import aifc
+
+def generate_authentic_phoneme_clips(letter, info):
+    buzz_file = info["file"]
+    word = info["word"]
+    gain = info["gain"]
+    is_x = info["is_x"]
+    
+    buzz_aiff = f"/tmp/buzz_{letter}.aiff"
+    subprocess.run(["afconvert", "-f", "AIFF", "-d", "BEI16@22050", "-c", "1", buzz_file, buzz_aiff], check=True)
+    
+    f_buzz = aifc.open(buzz_aiff, "r")
+    n_buzz = f_buzz.getnframes()
+    raw_buzz = f_buzz.readframes(n_buzz)
+    f_buzz.close()
+    
+    samples_buzz = list(struct.unpack(f">{n_buzz}h", raw_buzz))
+    amp_buzz = []
+    for s in samples_buzz:
+        v = int(s * gain)
+        if v > 31000: v = 31000
+        elif v < -31000: v = -31000
+        amp_buzz.append(v)
+        
+    silence_short = [0] * int(22050 * 0.25)
+    silence_mid = [0] * int(22050 * 0.4)
+    
+    # 1. Short clip
+    out_short = aifc.open(f"/tmp/short_{letter}.aiff", "w")
+    out_short.setnchannels(1)
+    out_short.setsampwidth(2)
+    out_short.setframerate(22050)
+    out_short.writeframes(struct.pack(f">{len(amp_buzz)}h", *amp_buzz))
+    out_short.close()
+    subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", f"/tmp/short_{letter}.aiff", os.path.join(AUDIO_DIR, f"short_{letter}.m4a")], check=True)
+
+    # 2. Sound clip
+    suffix_text = f"as in {word}!" if not is_x else "at the end of Fox and Box!"
+    suffix_aiff = f"/tmp/suffix_{letter}.aiff"
+    subprocess.run(["say", "-v", VOICE, "-r", "160", suffix_text, "-o", suffix_aiff], check=True)
+    subprocess.run(["afconvert", "-f", "AIFF", "-d", "BEI16@22050", "-c", "1", suffix_aiff, f"/tmp/suffix_{letter}_22k.aiff"], check=True)
+    
+    f_suf = aifc.open(f"/tmp/suffix_{letter}_22k.aiff", "r")
+    n_suf = f_suf.getnframes()
+    raw_suf = f_suf.readframes(n_suf)
+    f_suf.close()
+    samples_suf = list(struct.unpack(f">{n_suf}h", raw_suf))
+    
+    combined_sound = amp_buzz + silence_mid + amp_buzz + silence_short + samples_suf
+    out_sound = aifc.open(f"/tmp/sound_{letter}.aiff", "w")
+    out_sound.setnchannels(1)
+    out_sound.setsampwidth(2)
+    out_sound.setframerate(22050)
+    out_sound.writeframes(struct.pack(f">{len(combined_sound)}h", *combined_sound))
+    out_sound.close()
+    subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", f"/tmp/sound_{letter}.aiff", os.path.join(AUDIO_DIR, f"sound_{letter}.m4a")], check=True)
+
+    # 3. Prompt clip
+    prefix_text = "Which letter makes the"
+    prefix_aiff = f"/tmp/pre_{letter}.aiff"
+    subprocess.run(["say", "-v", VOICE, "-r", "160", prefix_text, "-o", prefix_aiff], check=True)
+    subprocess.run(["afconvert", "-f", "AIFF", "-d", "BEI16@22050", "-c", "1", prefix_aiff, f"/tmp/pre_{letter}_22k.aiff"], check=True)
+    
+    f_pre = aifc.open(f"/tmp/pre_{letter}_22k.aiff", "r")
+    n_pre = f_pre.getnframes()
+    raw_pre = f_pre.readframes(n_pre)
+    f_pre.close()
+    samples_pre = list(struct.unpack(f">{n_pre}h", raw_pre))
+    
+    post_text = f"sound, as in {word}?" if not is_x else "sound, at the end of Fox and Box?"
+    post_aiff = f"/tmp/post_{letter}.aiff"
+    subprocess.run(["say", "-v", VOICE, "-r", "160", post_text, "-o", post_aiff], check=True)
+    subprocess.run(["afconvert", "-f", "AIFF", "-d", "BEI16@22050", "-c", "1", post_aiff, f"/tmp/post_{letter}_22k.aiff"], check=True)
+    
+    f_post = aifc.open(f"/tmp/post_{letter}_22k.aiff", "r")
+    n_post = f_post.getnframes()
+    raw_post = f_post.readframes(n_post)
+    f_post.close()
+    samples_post = list(struct.unpack(f">{n_post}h", raw_post))
+    
+    combined_prompt = samples_pre + silence_short + amp_buzz + silence_short + samples_post
+    out_prompt = aifc.open(f"/tmp/prompt_{letter}.aiff", "w")
+    out_prompt.setnchannels(1)
+    out_prompt.setsampwidth(2)
+    out_prompt.setframerate(22050)
+    out_prompt.writeframes(struct.pack(f">{len(combined_prompt)}h", *combined_prompt))
+    out_prompt.close()
+    subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", f"/tmp/prompt_{letter}.aiff", os.path.join(AUDIO_DIR, f"prompt_{letter}.m4a")], check=True)
+
 print("🔊 Generating corrected phonetic audio files...")
 
 # A-Z Prompts and Pure Phonics Sounds
 for letter, data in PHONICS_MAP.items():
-    print(f"Generating A-Z sounds for {letter}...")
-    generate_clip(data["prompt"], f"prompt_{letter}")
-    generate_clip(data["sound"], f"sound_{letter}")
-    generate_clip(data["short"], f"short_{letter}")
+    if letter in AUTHENTIC_MAP:
+        print(f"Generating authentic phoneme audio for {letter}...")
+        generate_authentic_phoneme_clips(letter, AUTHENTIC_MAP[letter])
+    else:
+        print(f"Generating A-Z sounds for {letter}...")
+        generate_clip(data["prompt"], f"prompt_{letter}")
+        generate_clip(data["sound"], f"sound_{letter}")
+        generate_clip(data["short"], f"short_{letter}")
 
 # Praises
 for key, text in PRAISES.items():
@@ -193,3 +296,4 @@ for key, text in INTROS.items():
     generate_clip(text, key)
 
 print("🎉 All 88 corrected phonics audio clips generated successfully!")
+
