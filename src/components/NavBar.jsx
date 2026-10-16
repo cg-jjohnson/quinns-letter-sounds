@@ -95,21 +95,35 @@ const NavBar = ({
             />
           </Tooltip>
 
-          <Typography
-            variant="h5"
-            sx={{
-              fontWeight: 800,
-              background: 'linear-gradient(45deg, #FF4081, #7C4DFF)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              fontSize: { xs: '1.1rem', sm: '1.4rem' },
-              cursor: 'pointer',
-              display: { xs: 'none', sm: 'block' },
-            }}
-            onClick={handleGoLobby}
-          >
-            Quinn's Letter Sounds 🎈🔊
-          </Typography>
+          <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1 }}>
+            <Typography
+              variant="h5"
+              sx={{
+                fontWeight: 800,
+                background: 'linear-gradient(45deg, #FF4081, #7C4DFF)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                fontSize: { xs: '1.1rem', sm: '1.4rem' },
+                cursor: 'pointer',
+              }}
+              onClick={handleGoLobby}
+            >
+              Quinn's Letter Sounds 🎈🔊
+            </Typography>
+            <Chip
+              label="v1.2.0"
+              size="small"
+              sx={{
+                bgcolor: 'rgba(124, 77, 255, 0.12)',
+                color: '#7C4DFF',
+                fontWeight: 800,
+                fontSize: '0.72rem',
+                height: '22px',
+                borderRadius: '8px',
+                border: '1px solid rgba(124, 77, 255, 0.3)',
+              }}
+            />
+          </Box>
         </Box>
 
         {/* Center: Navigation Buttons */}

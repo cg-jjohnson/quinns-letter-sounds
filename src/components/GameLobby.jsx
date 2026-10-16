@@ -157,6 +157,13 @@ const GameLobby = ({ onSelectGame, activeProfile }) => {
           </Grid>
         ))}
       </Grid>
+
+      {/* Version & Audio Engine Info Footer */}
+      <Box sx={{ mt: 5, pt: 2, borderTop: '1px solid rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1 }}>
+        <Typography variant="caption" sx={{ color: '#718096', fontWeight: 600, letterSpacing: '0.5px' }}>
+          Quinn's Letter Sounds • <strong>v1.2.0</strong> • Pure Human Phonics Audio
+        </Typography>
+      </Box>
     </Box>
   );
 };

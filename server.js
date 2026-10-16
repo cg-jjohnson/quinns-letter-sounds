@@ -36,6 +36,17 @@ if (fs.existsSync(distDir)) {
 // REST API ENDPOINTS
 // -------------------------------------------------------------
 
+// GET /api/version - System version & audio engine information
+app.get('/api/version', (req, res) => {
+  res.json({
+    app: "Quinn's Letter Sounds",
+    version: "1.2.0",
+    audioEngine: "authentic-prerecorded-phonics",
+    buildDate: "2026-10-16",
+    features: ["pure-human-phonics", "profile-tracking", "balloon-game", "fishing-game", "matching-game"]
+  });
+});
+
 // GET /api/profiles - List all profiles
 app.get('/api/profiles', (req, res) => {
   try {
@@ -277,5 +288,5 @@ if (fs.existsSync(distDir)) {
 }
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Quinn's Letter Sounds Server running on http://0.0.0.0:${PORT}`);
+  console.log(`🚀 Quinn's Letter Sounds v1.2.0 running on http://0.0.0.0:${PORT}`);
 });

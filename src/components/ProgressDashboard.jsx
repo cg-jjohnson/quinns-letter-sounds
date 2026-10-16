@@ -207,8 +207,8 @@ const ProgressDashboard = ({
         </Grid>
       </Paper>
 
-      {/* Reset Stats */}
-      <Box sx={{ textAlign: 'center', mt: 2 }}>
+      {/* Reset Stats & System Version */}
+      <Box sx={{ textAlign: 'center', mt: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
         <Button
           variant="outlined"
           color="error"
@@ -219,6 +219,9 @@ const ProgressDashboard = ({
         >
           Reset Phonics Scores
         </Button>
+        <Typography variant="caption" sx={{ color: '#A0AEC0', fontWeight: 600 }}>
+          System Version: <strong>v1.2.0</strong> • Audio Engine: Pre-recorded Human Phonics
+        </Typography>
       </Box>
     </Box>
   );
