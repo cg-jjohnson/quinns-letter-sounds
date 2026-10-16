@@ -380,6 +380,18 @@ if (fs.existsSync(distDir)) {
   });
 }
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Quinn's Letter Sounds v1.3.1 running on http://0.0.0.0:${PORT}`);
-});
+function startServer(port) {
+  const server = app.listen(port, '0.0.0.0', () => {
+    console.log(`🚀 Quinn's Letter Sounds v1.3.2 running on http://localhost:${port}`);
+  });
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`⚠️ Port ${port} is already in use. Trying port ${Number(port) + 1}...`);
+      startServer(Number(port) + 1);
+    } else {
+      console.error('Server error:', err);
+    }
+  });
+}
+
+startServer(PORT);
